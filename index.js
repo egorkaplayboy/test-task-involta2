@@ -1,6 +1,6 @@
 async function parallelLimit(urls, limit, cb) {
   const memo = {};
-  const results = Array(urls.length).fill(null);
+  const results = [];
   async function fetchUrl(url, index) {
     if (memo[url]) {
       results[index] = memo[url];
@@ -11,16 +11,18 @@ async function parallelLimit(urls, limit, cb) {
     memo[url] = result;
     results[index] = result;
   }
-  const fetchAll = async (start) => {
-    const batch = urls.slice(start, start + limit);
-    const promises = batch.map(async (url, index) => {
-      await fetchUrl(url, start + index);
-    });
-    await Promise.all(promises);
-  };
-  for (let i = 0; i < urls.length; i += limit) {
-    await fetchAll(i);
+  async function fetchNext() {
+    for (let i = 0; i < urls.length; i++) {
+      if (results[i] === undefined) {
+        await fetchUrl(urls[i], i);
+      }
+    }
   }
+  const fetchPromises = [];
+  for (let i = 0; i < limit; i++) {
+    fetchPromises.push(fetchNext());
+  }
+  await Promise.all(fetchPromises);
   cb(results);
 }
 
@@ -30,8 +32,7 @@ const urls = [
   "https://jsonplaceholder.typicode.com/posts/3",
   "https://jsonplaceholder.typicode.com/posts/3",
 ];
-const limit = 1;
-
+const limit = 2;
 parallelLimit(urls, limit, (responses) => {
   console.log(responses);
 });
